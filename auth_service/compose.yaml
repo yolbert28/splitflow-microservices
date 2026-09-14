@@ -8,9 +8,10 @@ services:
     ports:
       - '5432:5432'
   rabbitmq:
-    image: 'rabbitmq:latest'
+    image: 'rabbitmq:4-management'
     environment:
       - 'RABBITMQ_DEFAULT_PASS=secret'
       - 'RABBITMQ_DEFAULT_USER=myuser'
     ports:
-      - '5672'
+      - '5672:5672'
+      - '15672:15672'
