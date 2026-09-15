@@ -3,6 +3,8 @@ package dev.yolbert.auth_service.config;
 import dev.yolbert.auth_service.dto.ApiErrorDetail;
 import dev.yolbert.auth_service.dto.ApiErrorResponse;
 import dev.yolbert.auth_service.utils.exceptions.EmailAlreadyExistsException;
+import dev.yolbert.auth_service.utils.exceptions.InvalidOtpException;
+import dev.yolbert.auth_service.utils.exceptions.TooManyOtpAttemptsException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -62,6 +64,33 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(InvalidOtpException.class)
+    public ResponseEntity<ApiErrorResponse> handleInvalidOtp(InvalidOtpException ex) {
+        List<ApiErrorDetail> errors = List.of(
+                ApiErrorDetail.builder()
+                        .field("otp_code")
+                        .code("INVALID_OR_EXPIRED")
+                        .message(ex.getMessage())
+                        .build()
+        );
+
+        return ResponseEntity.badRequest().body(
+                ApiErrorResponse.builder()
+                        .message(ex.getMessage())
+                        .errors(errors)
+                        .build()
+        );
+    }
+
+    @ExceptionHandler(TooManyOtpAttemptsException.class)
+    public ResponseEntity<ApiErrorResponse> handleTooManyOtpAttempts(TooManyOtpAttemptsException ex) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(
+                ApiErrorResponse.builder()
+                        .message(ex.getMessage())
+                        .build()
+        );
+    }
+
     /**
      * Catch-all handler. Logs internally but does not expose details to the client.
      * Returns 500 with a generic message.
@@ -72,7 +101,6 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
                 ApiErrorResponse.builder()
                         .message("Ocurrió un error inesperado. Intenta nuevamente más tarde.")
-                        .errors(List.of())
                         .build()
         );
     }
