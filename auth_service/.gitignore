@@ -32,8 +32,5 @@ build/
 ### VS Code ###
 .vscode/
 
-### AI files ###
-SPEC.md
-
 ### Dev-only Docker Compose overrides ###
 compose.override.yaml
