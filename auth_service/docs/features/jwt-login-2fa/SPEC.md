@@ -256,6 +256,9 @@ No conviertas una preferencia del agente en una restricción. -->
   mecanismo existente a menos que se decida explícitamente otro valor.
 - Los mensajes de error en el login deben ser **genéricos** (no revelan si el
   email existe), siguiendo los principios de seguridad del API Guidelines.
+- El refresh token se almacena como hash **SHA-256** (hex) en `session.refresh_token_hash`.
+  SHA-256 es suficiente porque el token es un UUID v4 de 128 bits de entropía; no
+  se requiere hash lento (BCrypt) para valores de alta entropía generados aleatoriamente.
 - Se debe mantener la compatibilidad con los endpoints existentes
   (`POST /user/`, `POST /auth/verify-email`); esta funcionalidad no los modifica.
 

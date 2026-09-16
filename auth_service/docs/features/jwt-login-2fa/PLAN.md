@@ -67,11 +67,11 @@ El flujo completo de login se implementa en dos pasos consecutivos, siguiendo el
 **Recorrido de datos — login completo:**
 `POST /auth/login` → `LoginUseCase` → `UserRepository.findByEmail` → `BCryptPasswordEncoder.matches` → `OtpRepository` (invalidar pendiente) → `OtpCodeGenerator` → `OtpRepository.save` → `OutboxRepository.save` → `200 OK`
 
-`POST /auth/login/verify-2fa` → `VerifyLoginOtpUseCase` → `OtpRepository` → validación → `JwtTokenProvider.generateAccessToken` → generar refresh token opaco → `BCrypt.encode(refreshToken)` → `SessionRepository.save` → `200 OK + tokens`
+`POST /auth/login/verify-2fa` → `VerifyLoginOtpUseCase` → `OtpRepository` → validación → `JwtTokenProvider.generateAccessToken` → generar refresh token opaco → `TokenHasher.hash(refreshToken)` → `SessionRepository.save` → `200 OK + tokens`
 
 **Generación de tokens:**
 - **Access token:** `io.jsonwebtoken:jjwt-*` (JJWT 0.12.x). Se firma con clave privada RS256 cargada desde PEM en propiedades de entorno. Claims: `sub` (user UUID string), `exp` (ahora + 1 hora).
-- **Refresh token:** `UUID.randomUUID().toString()` (token opaco). Se almacena como `BCrypt.encode(refreshToken)` en `session.refresh_token_hash`.
+- **Refresh token:** `UUID.randomUUID().toString()` (token opaco). Se almacena como `TokenHasher.hash(refreshToken)` (SHA-256 en hex) en `session.refresh_token_hash`. SHA-256 es determinista, lo que permite una consulta indexada exacta en lugar de un escaneo por tabla.
 
 ## Contrato de API
 
@@ -172,8 +172,8 @@ No aplica — proyecto de módulo único sin modularización explícita.
   - `Outbox` (existente): se crea un evento `USER_LOGIN_OTP` en el paso 1 con payload `{id, email, otp_code}`.
 
 - **Identificadores, relaciones y restricciones:**
-  - La sesión se identifica por `refreshTokenHash` (búsqueda por hash BCrypt).
-  - La comparación del refresh token recibido contra el hash almacenado se hace con `BCryptPasswordEncoder.matches`.
+  - La sesión se identifica por `refreshTokenHash` (SHA-256 del token recibido).
+  - La comparación del refresh token recibido contra el hash almacenado se hace calculando `TokenHasher.hash(token)` y buscando con `findByRefreshTokenHash(hash)` — consulta indexada O(log n).
   - Un refresh token revocado (`revoked = true`) nunca puede volver a usarse.
 
 - **Origen de los datos y transformaciones (entrada → dominio → persistencia/salida):**
@@ -208,7 +208,7 @@ tratamiento especial. -->
   - Cualquier endpoint futuro no incluido en la lista pública de `SecurityConfig` requerirá access token válido.
 
 - **Datos sensibles (PII, secretos) y su tratamiento en almacenamiento y logs:**
-  - El refresh token **nunca** se almacena en claro: solo su hash BCrypt.
+  - El refresh token **nunca** se almacena en claro: solo su hash SHA-256 (hex).
   - La clave privada RS256 se carga desde una variable de entorno o archivo externo, nunca desde el código fuente.
   - Los logs no registran `password`, `otp_code`, tokens ni hashes.
   - El payload del outbox incluye `otp_code` (necesario para el servicio de email); se trata como dato sensible — el publisher no debe logarlo.
@@ -220,10 +220,10 @@ tratamiento especial. -->
 <!-- Completa solo lo aplicable. -->
 
 - **Impacto en consultas a base de datos:**
-  - `idx_session_refresh_token_hash` ya existe (V3); las búsquedas de sesión son O(log n).
+  - `idx_session_refresh_token_hash` ya existe (V3); la búsqueda de sesión por hash SHA-256 es O(log n) con una consulta exacta.
   - `idx_session_user_id` ya existe (V3); sin riesgo de N+1 en las operaciones de sesión.
   - `idx_otp_user_id` ya existe (V2); la consulta de OTP pendiente está indexada.
-  - La comparación BCrypt del refresh token se hace en memoria; tiene coste fijo independiente del volumen de datos.
+  - El cálculo SHA-256 del refresh token se hace en memoria y tiene coste constante y despreciable.
 
 - **Paginación:** No aplica — ningún endpoint de esta entrega devuelve colecciones.
 

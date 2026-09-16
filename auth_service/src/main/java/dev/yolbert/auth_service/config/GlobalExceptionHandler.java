@@ -3,7 +3,9 @@ package dev.yolbert.auth_service.config;
 import dev.yolbert.auth_service.dto.ApiErrorDetail;
 import dev.yolbert.auth_service.dto.ApiErrorResponse;
 import dev.yolbert.auth_service.utils.exceptions.EmailAlreadyExistsException;
+import dev.yolbert.auth_service.utils.exceptions.InvalidCredentialsException;
 import dev.yolbert.auth_service.utils.exceptions.InvalidOtpException;
+import dev.yolbert.auth_service.utils.exceptions.SessionNotFoundException;
 import dev.yolbert.auth_service.utils.exceptions.TooManyOtpAttemptsException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -85,6 +87,33 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(TooManyOtpAttemptsException.class)
     public ResponseEntity<ApiErrorResponse> handleTooManyOtpAttempts(TooManyOtpAttemptsException ex) {
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).body(
+                ApiErrorResponse.builder()
+                        .message(ex.getMessage())
+                        .build()
+        );
+    }
+
+    /**
+     * Handles invalid login credentials. The response is generic so it does not
+     * reveal whether the email exists.
+     * Returns 401.
+     */
+    @ExceptionHandler(InvalidCredentialsException.class)
+    public ResponseEntity<ApiErrorResponse> handleInvalidCredentials(InvalidCredentialsException ex) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
+                ApiErrorResponse.builder()
+                        .message(ex.getMessage())
+                        .build()
+        );
+    }
+
+    /**
+     * Handles a refresh token that does not match any active session.
+     * Returns 401.
+     */
+    @ExceptionHandler(SessionNotFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handleSessionNotFound(SessionNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
                 ApiErrorResponse.builder()
                         .message(ex.getMessage())
                         .build()

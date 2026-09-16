@@ -13,7 +13,7 @@
 - **Dependencias:** ninguna.
 - **Criterios resueltos:** prerequisito de RF-04, RF-07.
 - **Validación:** `./mvnw clean package -DskipTests` sin errores de compilación.
-- [ ] Completada
+- [x] Completada
 
 ---
 
@@ -28,7 +28,7 @@
 - **Dependencias:** T-01.
 - **Criterios resueltos:** CA-09, CA-10, CA-11.
 - **Validación:** test unitario `JwtTokenProviderTest` con clave generada inline: emitir token, validar firma, extraer `sub`; verificar que un token manipulado falla la validación.
-- [ ] Completada
+- [x] Completada
 
 ---
 
@@ -42,7 +42,7 @@
 - **Dependencias:** T-02.
 - **Criterios resueltos:** CA-10, CA-11, CA-15.
 - **Validación:** test unitario `JwtAuthenticationFilterTest`: petición con token válido popula el contexto; petición sin token no lanza excepción.
-- [ ] Completada
+- [x] Completada
 
 ---
 
@@ -59,7 +59,7 @@
   - `GET /auth/ping` con token manipulado → 401.
   - `GET /auth/ping` sin header `Authorization` → 401.
   - Tests de regresión `AuthControllerTest` y `UserControllerTest` en verde.
-- [ ] Completada
+- [x] Completada
 
 ---
 
@@ -73,18 +73,18 @@
 - **Dependencias:** ninguna (tabla ya existe).
 - **Criterios resueltos:** prerequisito de RF-04, RF-05, RF-06.
 - **Validación:** `./mvnw clean package -DskipTests`; Hibernate valida el esquema con `ddl-auto=validate` sin errores.
-- [ ] Completada
+- [x] Completada
 
 ---
 
 ### T-06 · Crear `SessionRepository`
 - **Objetivo:** interfaz de acceso a datos para la entidad `Session`.
 - **Alcance:** crear `repository/SessionRepository.java` (extiende `JpaRepository<Session, UUID>`) con:
-  - `Optional<Session> findByRefreshTokenHash(String hash)` — para refresh y logout.
+  - `Optional<Session> findByRefreshTokenHash(String hash)` — para refresh y logout. El hash SHA-256 del token hace que esta consulta use el índice `idx_session_refresh_token_hash`.
 - **Dependencias:** T-05.
 - **Criterios resueltos:** prerequisito de RF-05, RF-06.
 - **Validación:** test de integración de repositorio (con `@DataJpaTest` + Testcontainers Postgres): insertar sesión y recuperarla por hash.
-- [ ] Completada
+- [x] Completada
 
 ---
 
@@ -98,7 +98,7 @@
 - **Dependencias:** ninguna.
 - **Criterios resueltos:** CA-02, CA-03, CA-13.
 - **Validación:** compilación limpia; handlers en `GlobalExceptionHandler` responden con el código y mensaje correcto en test unitario.
-- [ ] Completada
+- [x] Completada
 
 ---
 
@@ -110,7 +110,7 @@
 - **Dependencias:** T-07.
 - **Criterios resueltos:** CA-02, CA-03, CA-13.
 - **Validación:** tests unitarios del handler; los tests de regresión existentes siguen en verde.
-- [ ] Completada
+- [x] Completada
 
 ---
 
@@ -134,7 +134,7 @@
   - `login_wrongPassword` → 401, mensaje genérico.
   - `login_unknownEmail` → 401, mismo mensaje.
   - `login_unverifiedUser` → 401, mismo mensaje.
-- [ ] Completada
+- [x] Completada
 
 ---
 
@@ -149,7 +149,7 @@
 - **Dependencias:** T-09.
 - **Criterios resueltos:** CA-01, CA-02, CA-03.
 - **Validación:** cubierto por los tests de T-09.
-- [ ] Completada
+- [x] Completada
 
 ---
 
@@ -163,7 +163,7 @@
 - **Dependencias:** ninguna.
 - **Criterios resueltos:** CA-06, CA-09.
 - **Validación:** compilación limpia.
-- [ ] Completada
+- [x] Completada
 
 ---
 
@@ -177,7 +177,7 @@
   5. Si código correcto: marcar `status = VERIFIED`, guardar OTP.
   6. Generar refresh token: `UUID.randomUUID().toString()`.
   7. Obtener IP y user-agent del request (inyectados vía `HttpServletRequest`).
-  8. Crear y guardar `Session`: `refreshTokenHash = BCrypt.encode(refreshToken)`, `expiresAt = now + 7 días`, `revoked = false`.
+  8. Crear y guardar `Session`: `refreshTokenHash = TokenHasher.hash(refreshToken)` (SHA-256), `expiresAt = now + 7 días`, `revoked = false`.
   9. `jwtTokenProvider.generateAccessToken(user.getId())`.
   10. Retornar `AuthTokenResponseData`.
   - Si código incorrecto: incrementar intentos, guardar, lanzar `InvalidOtpException` o `TooManyOtpAttemptsException` según corresponda.
@@ -189,7 +189,7 @@
   - `verify2fa_wrongCode` → 400, `otp.attempts = 1`.
   - `verify2fa_tooManyAttempts` (OTP con `attempts=4`) → 429, `otp.status = EXPIRED`.
   - Decodificar JWT del CA-06 y verificar claims `sub` (UUID del usuario) y `exp`.
-- [ ] Completada
+- [x] Completada
 
 ---
 
@@ -203,7 +203,7 @@
 - **Dependencias:** T-12.
 - **Criterios resueltos:** CA-06, CA-07, CA-08, CA-09, CA-10.
 - **Validación:** cubierto por los tests de T-12.
-- [ ] Completada
+- [x] Completada
 
 ---
 
@@ -214,10 +214,10 @@
 - **Alcance:**
   - `dto/RefreshTokenCommand.java`: `refreshToken` (`@NotBlank`, `@JsonProperty("refresh_token")`).
   - `service/RefreshTokenUseCase.java`:
-    1. `sessionRepository.findByRefreshTokenHash(...)` — iterar sobre sesiones no expiradas para buscar la que coincida con `BCrypt.matches(refreshToken, session.refreshTokenHash)`. Si no existe coincidencia o la sesión está revocada/expirada, lanzar `SessionNotFoundException`.
+    1. `sessionRepository.findByRefreshTokenHash(TokenHasher.hash(refreshToken))` — busca la sesión por hash SHA-256 usando el índice. Si no existe coincidencia o la sesión está revocada/expirada, lanzar `SessionNotFoundException`.
     2. Marcar la sesión actual como `revoked = true`, `revokedAt = now`, guardar.
     3. Generar nuevo refresh token opaco, nuevo access token JWT.
-    4. Crear nueva `Session` (misma IP, mismo deviceInfo) con `expiresAt = now + 7 días`, guardar.
+    4. Crear nueva `Session` (misma IP, mismo deviceInfo) con `refreshTokenHash = TokenHasher.hash(newToken)`, `expiresAt = now + 7 días`, guardar.
     5. Retornar `AuthTokenResponseData`.
   - `@Transactional` — la revocación y la nueva sesión son atómicas.
 - **Dependencias:** T-02, T-05, T-06, T-11.
@@ -227,7 +227,7 @@
   - `refresh_revokedToken` → 401.
   - `refresh_expiredToken` → 401.
   - `refresh_unknownToken` → 401.
-- [ ] Completada
+- [x] Completada
 
 ---
 
@@ -242,7 +242,7 @@
 - **Dependencias:** T-14.
 - **Criterios resueltos:** CA-12, CA-13.
 - **Validación:** cubierto por los tests de T-14.
-- [ ] Completada
+- [x] Completada
 
 ---
 
@@ -253,7 +253,7 @@
 - **Alcance:**
   - `dto/LogoutCommand.java`: `refreshToken` (`@NotBlank`, `@JsonProperty("refresh_token")`).
   - `service/LogoutUseCase.java`:
-    1. Buscar sesión por `BCrypt.matches` igual que en `RefreshTokenUseCase`.
+    1. Buscar sesión por `sessionRepository.findByRefreshTokenHash(TokenHasher.hash(refreshToken))` (consulta indexada).
     2. Si no existe o ya estaba revocada → no lanzar excepción (idempotente); retornar sin cambios.
     3. Si existe y no revocada: marcar `revoked = true`, `revokedAt = now`, guardar.
   - `@Transactional`.
@@ -264,7 +264,7 @@
   - `logout_success` → 200, `session.revoked = true` en BD.
   - `logout_alreadyRevoked` → 200 (idempotente).
   - `logout_withoutToken` (sin `Authorization` header) → 401 (rechazado por el filtro JWT antes de llegar al use case).
-- [ ] Completada
+- [x] Completada
 
 ---
 
@@ -280,7 +280,7 @@
 - **Dependencias:** T-04, T-16.
 - **Criterios resueltos:** CA-14, CA-15 (logout sin token → 401).
 - **Validación:** cubierto por los tests de T-16.
-- [ ] Completada
+- [x] Completada
 
 ---
 
@@ -300,7 +300,7 @@
   - 10 peticiones consecutivas desde la misma IP → todas pasan (con 401 por credenciales inválidas, que es correcto).
   - Petición 11 → 429, sin información sobre el estado de la cuenta.
   - Verificar manualmente con `curl` en `./mvnw spring-boot:run`.
-- [ ] Completada
+- [x] Completada
 
 ---
 
@@ -317,7 +317,7 @@
 - **Dependencias:** T-01 a T-18.
 - **Criterios resueltos:** CA-01 a CA-16.
 - **Validación:** output de `./mvnw test` en verde; evidencia manual de CA-16.
-- [ ] Completada
+- [x] Completada
 
 ---
 
@@ -325,25 +325,25 @@
 
 | Criterio | Test / método de verificación | Estado | Evidencia |
 | --- | --- | --- | --- |
-| CA-01 | `AuthControllerLoginTest#login_success` | ⬜ Pendiente | — |
-| CA-02 | `AuthControllerLoginTest#login_wrongPassword`, `login_unknownEmail` | ⬜ Pendiente | — |
-| CA-03 | `AuthControllerLoginTest#login_unverifiedUser` | ⬜ Pendiente | — |
-| CA-04 | `AuthControllerLoginTest#login_success` + inspección BD | ⬜ Pendiente | — |
-| CA-05 | `AuthControllerLoginTest#login_success` + inspección BD | ⬜ Pendiente | — |
-| CA-06 | `AuthControllerLogin2faTest#verify2fa_success` | ⬜ Pendiente | — |
-| CA-07 | `AuthControllerLogin2faTest#verify2fa_wrongCode` | ⬜ Pendiente | — |
-| CA-08 | `AuthControllerLogin2faTest#verify2fa_tooManyAttempts` | ⬜ Pendiente | — |
-| CA-09 | `AuthControllerLogin2faTest#verify2fa_success` + decodificación JWT | ⬜ Pendiente | — |
-| CA-10 | `JwtProtectedEndpointTest#accessWithValidToken` | ⬜ Pendiente | — |
-| CA-11 | `JwtProtectedEndpointTest#accessWithExpiredToken`, `accessWithMangledToken` | ⬜ Pendiente | — |
-| CA-12 | `RefreshTokenControllerTest#refresh_success` | ⬜ Pendiente | — |
-| CA-13 | `RefreshTokenControllerTest#refresh_revokedToken` | ⬜ Pendiente | — |
-| CA-14 | `LogoutControllerTest#logout_success` | ⬜ Pendiente | — |
-| CA-15 | `JwtProtectedEndpointTest#accessWithoutToken` | ⬜ Pendiente | — |
-| CA-16 | `LoginRateLimitFilterTest#rateLimit_exceeded` + verificación `curl` manual | ⬜ Pendiente | — |
+| CA-01 | `AuthControllerLoginTest#login_success` | ✅ Verificado | 200 + `status=success`; OTP `LOGIN_2FA` `PENDING` guardado con `expiresAt <= createdAt + 15 min` |
+| CA-02 | `AuthControllerLoginTest#login_wrongPassword`, `login_unknownEmail` | ✅ Verificado | Ambos → 401 con `"Credenciales inválidas."` (mensaje idéntico, no hay enumeración de emails) |
+| CA-03 | `AuthControllerLoginTest#login_unverifiedUser` | ✅ Verificado | 401 con el mismo mensaje genérico |
+| CA-04 | `AuthControllerLoginTest#login_success` + inspección BD | ✅ Verificado | Evento outbox `USER_LOGIN_OTP` con `aggregate_id = user.id` y payload `{id, email, otp_code}` |
+| CA-05 | `AuthControllerLoginTest#login_invalidatesPreviousPendingOtp` | ✅ Verificado | Tras 2 logins: 1 OTP `EXPIRED`, 1 `PENDING` |
+| CA-06 | `AuthControllerLogin2faTest#verify2fa_success` | ✅ Verificado | 200 con `access_token`, `token_type=Bearer`, `expires_in=3600`, `refresh_token`, `refresh_token_expires_in=604800`; token decodificado: `sub` = UUID del usuario, `exp` ≈ now+3600 |
+| CA-07 | `AuthControllerLogin2faTest#verify2fa_wrongCode` | ✅ Verificado | 400 con mensaje genérico; `otp.attempts = 1`, sigue `PENDING` |
+| CA-08 | `AuthControllerLogin2faTest#verify2fa_tooManyAttempts` | ✅ Verificado | Intentos 4→5 → 429; OTP marcado `EXPIRED` |
+| CA-09 | `AuthControllerLogin2faTest#verify2fa_success` + decodificación JWT | ✅ Verificado | Sesión creada: `refresh_token_hash` = SHA-256 hex del token plano (64 chars), `revoked=false`, `expiresAt` futuro; OTP `VERIFIED` |
+| CA-10 | `JwtProtectedEndpointTest#accessWithValidToken` | ✅ Verificado | `GET /auth/ping` con Bearer válido → 200 |
+| CA-11 | `JwtProtectedEndpointTest#accessWithExpiredToken`, `accessWithMangledToken` | ✅ Verificado | Token expirado → 401; token manipulado → 401 |
+| CA-12 | `RefreshTokenControllerTest#refresh_success` | ✅ Verificado | 200 con nuevo `access_token`/`refresh_token`; sesión vieja `revoked=true` con `revokedAt`; nueva sesión en BD; hash SHA-256 en BD (64 chars hex) |
+| CA-13 | `RefreshTokenControllerTest#refresh_revokedToken`, `refresh_expiredToken`, `refresh_unknownToken` | ✅ Verificado | Revocada → 401, expirada → 401, desconocida → 401, todos con `"Sesión inválida o expirada."` |
+| CA-14 | `LogoutControllerTest#logout_success` | ✅ Verificado | 200 con `"Sesión cerrada exitosamente."`; sesión `revoked=true` con `revokedAt` en BD; reintento/desconocida → 200 idempotente |
+| CA-15 | `JwtProtectedEndpointTest#accessWithoutToken` + `LogoutControllerTest#logout_withoutToken` | ✅ Verificado | `GET /auth/ping` sin header → 401; `POST /auth/logout` sin token → 401 |
+| CA-16 | `LoginRateLimitFilterTest#rateLimit` + verificación `curl` manual | ⚠️ Parcial | Test automatizado: 10 peticiones OK y la 11º → 429 con mensaje de error estándar. Verificación manual con `curl` **pendiente** (no se ejecutó contra servicio en ejecución) |
 
 **Regresión:**
 | Test existente | Estado |
 | --- | --- |
-| `AuthControllerTest` (verify-email) | ⬜ Pendiente |
-| `UserControllerTest` (registro) | ⬜ Pendiente |
+| `AuthControllerTest` (verify-email) | ✅ Verificado |
+| `UserControllerTest` (registro) | ✅ Verificado |

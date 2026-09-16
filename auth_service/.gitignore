@@ -34,3 +34,6 @@ build/
 
 ### Dev-only Docker Compose overrides ###
 compose.override.yaml
+
+### Environment files ###
+.env
