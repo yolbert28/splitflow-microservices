@@ -14,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.List;
 
@@ -152,6 +153,20 @@ public class GlobalExceptionHandler {
         return ResponseEntity.badRequest().body(
                 ApiErrorResponse.builder()
                         .message(ex.getMessage())
+                        .build()
+        );
+    }
+
+    /**
+     * Handles requests to paths without a handler (e.g., the removed
+     * {@code POST /user/} registration endpoint).
+     * Returns 404.
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ApiErrorResponse> handleNoResourceFound(NoResourceFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(
+                ApiErrorResponse.builder()
+                        .message("Recurso no encontrado.")
                         .build()
         );
     }

@@ -2,6 +2,7 @@ package dev.yolbert.auth_service.controller;
 
 import dev.yolbert.auth_service.dto.*;
 import dev.yolbert.auth_service.service.ChangePasswordUseCase;
+import dev.yolbert.auth_service.service.DeleteAccountUseCase;
 import dev.yolbert.auth_service.service.RegenerateFriendCodeUseCase;
 import dev.yolbert.auth_service.service.UpdateProfileUseCase;
 import jakarta.validation.Valid;
@@ -19,13 +20,16 @@ public class UserProfileController {
     private final ChangePasswordUseCase changePasswordUseCase;
     private final UpdateProfileUseCase updateProfileUseCase;
     private final RegenerateFriendCodeUseCase regenerateFriendCodeUseCase;
+    private final DeleteAccountUseCase deleteAccountUseCase;
 
     public UserProfileController(ChangePasswordUseCase changePasswordUseCase,
                                  UpdateProfileUseCase updateProfileUseCase,
-                                 RegenerateFriendCodeUseCase regenerateFriendCodeUseCase) {
+                                 RegenerateFriendCodeUseCase regenerateFriendCodeUseCase,
+                                 DeleteAccountUseCase deleteAccountUseCase) {
         this.changePasswordUseCase       = changePasswordUseCase;
         this.updateProfileUseCase       = updateProfileUseCase;
         this.regenerateFriendCodeUseCase = regenerateFriendCodeUseCase;
+        this.deleteAccountUseCase        = deleteAccountUseCase;
     }
 
     @PatchMapping("/me/password")
@@ -64,6 +68,18 @@ public class UserProfileController {
         return ResponseEntity.ok(ApiSuccessResponse.<FriendCodeResponseData>builder()
                 .message("Código de amigo generado exitosamente.")
                 .data(responseData)
+                .build());
+    }
+
+    @DeleteMapping("/me")
+    public ResponseEntity<ApiSuccessResponse<Void>> deleteAccount() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        UUID userId = (UUID) auth.getPrincipal();
+
+        deleteAccountUseCase.execute(userId);
+
+        return ResponseEntity.ok(ApiSuccessResponse.<Void>builder()
+                .message("Cuenta eliminada exitosamente.")
                 .build());
     }
 }

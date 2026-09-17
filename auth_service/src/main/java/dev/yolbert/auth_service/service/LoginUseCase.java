@@ -49,7 +49,7 @@ public class LoginUseCase {
      */
     @Transactional
     public void execute(LoginCommand command) {
-        User user = userRepository.findByEmail(command.getEmail())
+        User user = userRepository.findByEmailAndDeletedAtIsNull(command.getEmail())
                 .orElseThrow(() -> new InvalidCredentialsException(INVALID_CREDENTIALS_MSG));
 
         if (!passwordEncoder.matches(command.getPassword(), user.getPasswordHash())

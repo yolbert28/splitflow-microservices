@@ -4,6 +4,7 @@ import dev.yolbert.auth_service.dto.*;
 import dev.yolbert.auth_service.service.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -23,6 +24,7 @@ public class AuthController {
     private final ResetPasswordRequestUseCase resetPasswordRequestUseCase;
     private final ResetPasswordConfirmUseCase resetPasswordConfirmUseCase;
     private final ResendVerificationUseCase resendVerificationUseCase;
+    private final RegisterUseCase registerUseCase;
 
     public AuthController(VerifyEmailUseCase verifyEmailUseCase,
                           LoginUseCase loginUseCase,
@@ -31,7 +33,8 @@ public class AuthController {
                           LogoutUseCase logoutUseCase,
                           ResetPasswordRequestUseCase resetPasswordRequestUseCase,
                           ResetPasswordConfirmUseCase resetPasswordConfirmUseCase,
-                          ResendVerificationUseCase resendVerificationUseCase) {
+                          ResendVerificationUseCase resendVerificationUseCase,
+                          RegisterUseCase registerUseCase) {
         this.verifyEmailUseCase          = verifyEmailUseCase;
         this.loginUseCase                = loginUseCase;
         this.verifyLoginOtpUseCase       = verifyLoginOtpUseCase;
@@ -40,6 +43,25 @@ public class AuthController {
         this.resetPasswordRequestUseCase = resetPasswordRequestUseCase;
         this.resetPasswordConfirmUseCase = resetPasswordConfirmUseCase;
         this.resendVerificationUseCase   = resendVerificationUseCase;
+        this.registerUseCase             = registerUseCase;
+    }
+
+    /**
+     * POST /auth/register
+     * Registers a new user account.
+     */
+    @PostMapping("/register")
+    public ResponseEntity<ApiSuccessResponse<UserResponseData>> register(
+            @Valid @RequestBody RegisterUserCommand command) {
+
+        UserResponseData data = registerUseCase.execute(command);
+
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(ApiSuccessResponse.<UserResponseData>builder()
+                        .message("Cuenta creada. Revisa tu correo para verificar tu cuenta.")
+                        .data(data)
+                        .build());
     }
 
     /**

@@ -174,8 +174,8 @@ Layered architecture with explicit request/response boundaries. The existing
 ### API design and contracts
 
 - REST over HTTP. Routes follow the existing convention:
-  - `POST /user/**` — user management (e.g., `POST /user/register`)
-  - `POST /auth/**` — authentication flows (e.g., `POST /auth/verify-email`)
+  - `POST /auth/**` — authentication flows (e.g., `POST /auth/register`, `POST /auth/verify-email`)
+  - `POST /auth/user/**` — user management (profile, password, account deletion)
 - All public endpoints are currently open (`permitAll`); authorization rules
   are defined in `SecurityConfig`.
 - Request bodies are validated with Bean Validation (`jakarta.validation`)

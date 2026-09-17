@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import dev.yolbert.auth_service.utils.validation.PasswordsMatch;
 import dev.yolbert.auth_service.utils.validation.ValidFullName;
 import dev.yolbert.auth_service.utils.validation.ValidPassword;
+import dev.yolbert.auth_service.utils.validation.ValidPhotoUrl;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -32,4 +33,8 @@ public class RegisterUserCommand {
     @NotBlank(message = "La confirmación de contraseña es obligatoria.")
     @JsonProperty("confirm_password")
     private String confirmPassword;
+
+    @ValidPhotoUrl
+    @JsonProperty("photo_url")
+    private String photoUrl;
 }

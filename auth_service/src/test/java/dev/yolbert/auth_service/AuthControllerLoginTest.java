@@ -175,6 +175,23 @@ class AuthControllerLoginTest {
     }
 
     @Test
+    void login_deletedAccount_returnsGenericError() throws Exception {
+        User user = createTestUser(TEST_EMAIL, true);
+        user.setDeletedAt(LocalDateTime.now());
+        userRepository.save(user);
+
+        mockMvc.perform(post(LOGIN_ENDPOINT)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(buildBody(TEST_EMAIL, TEST_PASSWORD)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value("error"))
+                .andExpect(jsonPath("$.message").value("Credenciales inválidas."));
+
+        List<Otp> otps = otpRepository.findAll();
+        assertThat(otps).isEmpty();
+    }
+
+    @Test
     void login_invalidatesPreviousPendingOtp() throws Exception {
         createTestUser(TEST_EMAIL, true);
 

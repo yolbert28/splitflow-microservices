@@ -20,9 +20,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import dev.yolbert.auth_service.domain.entity.Otp;
 import dev.yolbert.auth_service.domain.entity.OtpPurpose;
 import dev.yolbert.auth_service.domain.entity.Outbox;
+import dev.yolbert.auth_service.domain.entity.User;
 import dev.yolbert.auth_service.repository.OtpRepository;
 import dev.yolbert.auth_service.repository.OutboxRepository;
+import dev.yolbert.auth_service.repository.UserRepository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -30,7 +33,7 @@ import java.util.UUID;
 @AutoConfigureMockMvc
 @Import(TestcontainersConfiguration.class)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-class UserControllerTest {
+class RegisterControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
@@ -44,12 +47,15 @@ class UserControllerTest {
     @Autowired
     private OutboxRepository outboxRepository;
 
+    @Autowired
+    private UserRepository userRepository;
+
     // ─── Helpers ────────────────────────────────────────────────────────────────
 
     private static final String VALID_FULL_NAME = "Ana María Torres";
     private static final String VALID_EMAIL     = "ana.torres@example.com";
     private static final String VALID_PASSWORD  = "Secure@123!";
-    private static final String ENDPOINT        = "/user/";
+    private static final String ENDPOINT        = "/auth/register";
 
     private String buildBody(String fullName, String email, String password, String confirmPassword) {
         return """
@@ -67,10 +73,25 @@ class UserControllerTest {
         );
     }
 
-    // ─── Criterio 1: happy path ──────────────────────────────────────────────────
+    private User createDeletedUser(String email) {
+        LocalDateTime now = LocalDateTime.now();
+        User user = User.builder()
+                .id(UUID.randomUUID())
+                .fullName("Cuenta Anterior")
+                .email(email)
+                .passwordHash("hash-deleted")
+                .friendCode("ANTERIOR00")
+                .createdAt(now.minusDays(30))
+                .updatedAt(now.minusDays(1))
+                .deletedAt(now)
+                .build();
+        return userRepository.save(user);
+    }
+
+    // ─── Criterio 1 (CA-09): happy path ─────────────────────────────────────────
 
     /**
-     * Criterio 1: Dados datos correctos → 201 con el body esperado.
+     * CA-09 / Criterio 1: Dados datos correctos → 201 con el body esperado.
      */
     @Test
     void registerUser_success() throws Exception {
@@ -293,5 +314,126 @@ class UserControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value("error"))
                 .andExpect(jsonPath("$.errors[?(@.field == 'email')]").exists());
+    }
+
+    // ─── CA-04: registro con email de cuenta eliminada ──────────────────────────
+
+    /**
+     * CA-04 — el email de una cuenta eliminada puede reutilizarse; la nueva
+     * cuenta empieza desde cero (id y friend_code distintos).
+     */
+    @Test
+    void registerUser_withEmailOfDeletedAccount_createsNewAccount() throws Exception {
+        String email = "reuse-" + UUID.randomUUID() + "@example.com";
+        User deleted = createDeletedUser(email);
+
+        String body = buildBody("Nueva Persona", email, VALID_PASSWORD, VALID_PASSWORD);
+
+        MvcResult result = mockMvc.perform(post(ENDPOINT)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.email").value(email))
+                .andExpect(jsonPath("$.data.friend_code").isNotEmpty())
+                .andReturn();
+
+        JsonNode data = objectMapper.readTree(result.getResponse().getContentAsString())
+                .path("data");
+        UUID newUserId = UUID.fromString(data.path("id").asText());
+        assertThat(newUserId).isNotEqualTo(deleted.getId());
+        assertThat(data.path("friend_code").asText()).isNotEqualTo(deleted.getFriendCode());
+
+        assertThat(userRepository.findById(deleted.getId())).isPresent();
+        assertThat(userRepository.findById(newUserId)).isPresent();
+        assertThat(userRepository.findById(newUserId).orElseThrow().getDeletedAt()).isNull();
+    }
+
+    // ─── CA-10: POST /user/ ya no existe ────────────────────────────────────────
+
+    /**
+     * CA-10 — tras la migración, el endpoint antiguo devuelve 404.
+     */
+    @Test
+    void registerUser_legacyEndpoint_returns404() throws Exception {
+        String body = buildBody(VALID_FULL_NAME, VALID_EMAIL, VALID_PASSWORD, VALID_PASSWORD);
+
+        mockMvc.perform(post("/user/")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isNotFound());
+    }
+
+    // ─── CA-11: photo_url válida en el registro ─────────────────────────────────
+
+    /**
+     * CA-11 — con photo_url válida se persiste y aparece en la respuesta.
+     */
+    @Test
+    void registerUser_withValidPhotoUrl_persistsIt() throws Exception {
+        String email = "photo-" + UUID.randomUUID() + "@example.com";
+        String validUrl = "https://cdn.example.com/avatar.png";
+        String body = """
+                {
+                  "full_name": "%s",
+                  "email": "%s",
+                  "password": "%s",
+                  "confirm_password": "%s",
+                  "photo_url": "%s"
+                }
+                """.formatted(VALID_FULL_NAME, email, VALID_PASSWORD, VALID_PASSWORD, validUrl);
+
+        MvcResult result = mockMvc.perform(post(ENDPOINT)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.photo_url").value(validUrl))
+                .andReturn();
+
+        JsonNode data = objectMapper.readTree(result.getResponse().getContentAsString())
+                .path("data");
+        User saved = userRepository.findById(UUID.fromString(data.path("id").asText())).orElseThrow();
+        assertThat(saved.getPhotoUrl()).isEqualTo(validUrl);
+    }
+
+    // ─── CA-12: registro sin photo_url ──────────────────────────────────────────
+
+    /**
+     * CA-12 — sin photo_url en el payload, la respuesta incluye "photo_url": null.
+     */
+    @Test
+    void registerUser_withoutPhotoUrl_photoUrlIsNull() throws Exception {
+        String email = "nophoto-" + UUID.randomUUID() + "@example.com";
+        String body = buildBody(VALID_FULL_NAME, email, VALID_PASSWORD, VALID_PASSWORD);
+
+        mockMvc.perform(post(ENDPOINT)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.photo_url").value((Object) null));
+    }
+
+    // ─── CA-13: photo_url inválida en el registro ───────────────────────────────
+
+    /**
+     * CA-13 — photo_url con esquema http → 400 con detalle del campo photoUrl.
+     */
+    @Test
+    void registerUser_invalidPhotoUrl_badRequest() throws Exception {
+        String email = "badphoto-" + UUID.randomUUID() + "@example.com";
+        String body = """
+                {
+                  "full_name": "%s",
+                  "email": "%s",
+                  "password": "%s",
+                  "confirm_password": "%s",
+                  "photo_url": "http://cdn.example.com/avatar.png"
+                }
+                """.formatted(VALID_FULL_NAME, email, VALID_PASSWORD, VALID_PASSWORD);
+
+        mockMvc.perform(post(ENDPOINT)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errors[?(@.field == 'photoUrl')]").exists());
     }
 }

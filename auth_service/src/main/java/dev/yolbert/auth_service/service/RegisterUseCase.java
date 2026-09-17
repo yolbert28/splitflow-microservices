@@ -59,7 +59,7 @@ public class RegisterUseCase {
      */
     @Transactional
     public UserResponseData execute(RegisterUserCommand command) {
-        if (userRepository.existsByEmail(command.getEmail())) {
+        if (userRepository.existsByEmailAndDeletedAtIsNull(command.getEmail())) {
             throw new EmailAlreadyExistsException(command.getEmail());
         }
 
@@ -72,6 +72,7 @@ public class RegisterUseCase {
                 .email(command.getEmail())
                 .passwordHash(passwordEncoder.encode(command.getPassword()))
                 .friendCode(FriendCodeGenerator.generate())
+                .photoUrl(command.getPhotoUrl())
                 .createdAt(now)
                 .updatedAt(now)
                 .build();

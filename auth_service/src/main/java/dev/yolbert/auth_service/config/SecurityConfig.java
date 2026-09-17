@@ -50,6 +50,9 @@ public class SecurityConfig {
                                     .build());
                 }))
             .authorizeHttpRequests(auth -> auth
+                .requestMatchers(HttpMethod.POST, "/auth/register").permitAll()
+                // Ruta muerta tras la migración: se mantiene pública para que el
+                // request llegue a Spring MVC y se responda 404 (CA-10).
                 .requestMatchers(HttpMethod.POST, "/user/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/auth/verify-email").permitAll()
                 .requestMatchers(HttpMethod.POST, "/auth/login").permitAll()
