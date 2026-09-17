@@ -2,6 +2,8 @@ package dev.yolbert.auth_service;
 
 import dev.yolbert.auth_service.config.JwtAuthenticationFilter;
 import dev.yolbert.auth_service.config.JwtTokenProvider;
+import dev.yolbert.auth_service.domain.entity.Session;
+import dev.yolbert.auth_service.repository.SessionRepository;
 import jakarta.servlet.FilterChain;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,15 +19,18 @@ import java.security.KeyPairGenerator;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import java.util.Base64;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 class JwtAuthenticationFilterTest {
 
     private JwtAuthenticationFilter filter;
     private JwtTokenProvider provider;
+    private SessionRepository sessionRepository;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -40,7 +45,8 @@ class JwtAuthenticationFilterTest {
         provider = new JwtTokenProvider(privateKeyPem, publicKeyPem);
         provider.init();
 
-        filter = new JwtAuthenticationFilter(provider);
+        sessionRepository = mock(SessionRepository.class);
+        filter = new JwtAuthenticationFilter(provider, sessionRepository);
         SecurityContextHolder.clearContext();
     }
 
@@ -50,9 +56,17 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
-    void doFilter_withValidToken_populatesSecurityContext() throws Exception {
+    void doFilter_withValidTokenAndActiveSession_populatesSecurityContext() throws Exception {
         UUID userId = UUID.randomUUID();
-        String token = provider.generateAccessToken(userId);
+        UUID sessionId = UUID.randomUUID();
+        String token = provider.generateAccessToken(userId, sessionId);
+
+        Session activeSession = Session.builder()
+                .id(sessionId)
+                .userId(userId)
+                .revoked(false)
+                .build();
+        when(sessionRepository.findById(sessionId)).thenReturn(Optional.of(activeSession));
 
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/auth/ping");
         request.addHeader(HttpHeaders.AUTHORIZATION, "Bearer " + token);
@@ -63,6 +77,43 @@ class JwtAuthenticationFilterTest {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         assertThat(authentication).isNotNull();
         assertThat(authentication.getPrincipal()).isEqualTo(userId);
+        assertThat(authentication.getDetails()).isEqualTo(sessionId);
+    }
+
+    @Test
+    void doFilter_withRevokedSession_clearsContext() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID sessionId = UUID.randomUUID();
+        String token = provider.generateAccessToken(userId, sessionId);
+
+        Session revokedSession = Session.builder()
+                .id(sessionId)
+                .userId(userId)
+                .revoked(true)
+                .build();
+        when(sessionRepository.findById(sessionId)).thenReturn(Optional.of(revokedSession));
+
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/auth/ping");
+        request.addHeader(HttpHeaders.AUTHORIZATION, "Bearer " + token);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, mock(FilterChain.class));
+
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+    }
+
+    @Test
+    void doFilter_withoutSidClaim_clearsContext() throws Exception {
+        UUID userId = UUID.randomUUID();
+        String tokenWithoutSid = provider.generateAccessToken(userId);
+
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/auth/ping");
+        request.addHeader(HttpHeaders.AUTHORIZATION, "Bearer " + tokenWithoutSid);
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        filter.doFilter(request, response, mock(FilterChain.class));
+
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
     }
 
     @Test

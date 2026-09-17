@@ -114,7 +114,7 @@ class LogoutControllerTest {
     void logout_success() throws Exception {
         User user = createUser();
         Session session = createSession(user.getId(), TEST_REFRESH_TOKEN, false);
-        String accessToken = jwtTokenProvider.generateAccessToken(user.getId());
+        String accessToken = jwtTokenProvider.generateAccessToken(user.getId(), session.getId());
 
         mockMvc.perform(post(LOGOUT_ENDPOINT)
                         .header("Authorization", "Bearer " + accessToken)
@@ -133,7 +133,8 @@ class LogoutControllerTest {
     void logout_alreadyRevoked() throws Exception {
         User user = createUser();
         createSession(user.getId(), TEST_REFRESH_TOKEN, true);
-        String accessToken = jwtTokenProvider.generateAccessToken(user.getId());
+        Session authSession = createSession(user.getId(), "auth-refresh-token", false);
+        String accessToken = jwtTokenProvider.generateAccessToken(user.getId(), authSession.getId());
 
         mockMvc.perform(post(LOGOUT_ENDPOINT)
                         .header("Authorization", "Bearer " + accessToken)
@@ -145,7 +146,8 @@ class LogoutControllerTest {
     @Test
     void logout_unknownToken() throws Exception {
         User user = createUser();
-        String accessToken = jwtTokenProvider.generateAccessToken(user.getId());
+        Session authSession = createSession(user.getId(), "auth-refresh-token", false);
+        String accessToken = jwtTokenProvider.generateAccessToken(user.getId(), authSession.getId());
 
         mockMvc.perform(post(LOGOUT_ENDPOINT)
                         .header("Authorization", "Bearer " + accessToken)

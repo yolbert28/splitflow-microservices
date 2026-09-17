@@ -24,10 +24,10 @@ public class FullNameValidator implements ConstraintValidator<ValidFullName, Str
 
     @Override
     public boolean isValid(String value, ConstraintValidatorContext context) {
-        if (value == null || value.isBlank()) {
-            return false;
+        if (value == null) {
+            return true;
         }
-        if (value.length() > MAX_LENGTH) {
+        if (value.isBlank() || value.length() > MAX_LENGTH) {
             return false;
         }
         return VALID_NAME.matcher(value).matches();

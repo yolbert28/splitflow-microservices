@@ -65,7 +65,7 @@ public class RefreshTokenUseCase {
                 .build();
         sessionRepository.save(newSession);
 
-        String accessToken = jwtTokenProvider.generateAccessToken(newSession.getUserId());
+        String accessToken = jwtTokenProvider.generateAccessToken(newSession.getUserId(), newSession.getId());
         return AuthTokenResponseData.builder()
                 .accessToken(accessToken)
                 .tokenType("Bearer")

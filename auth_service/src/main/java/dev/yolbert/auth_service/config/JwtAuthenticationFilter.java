@@ -1,5 +1,6 @@
 package dev.yolbert.auth_service.config;
 
+import dev.yolbert.auth_service.repository.SessionRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -16,17 +17,20 @@ import java.util.UUID;
 
 /**
  * Spring Security filter that validates the {@code Authorization: Bearer <token>}
- * header and populates the {@code SecurityContext} for the request.
+ * header, verifies that its underlying session (claim {@code sid}) is active,
+ * and populates the {@code SecurityContext} for the request.
  *
- * <p>Invalid or missing tokens are left unauthenticated; Spring Security then
+ * <p>Invalid, revoked, or missing-session tokens are left unauthenticated; Spring Security then
  * rejects the request with 401 when the route requires authentication.
  */
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenProvider jwtTokenProvider;
+    private final SessionRepository sessionRepository;
 
-    public JwtAuthenticationFilter(JwtTokenProvider jwtTokenProvider) {
-        this.jwtTokenProvider = jwtTokenProvider;
+    public JwtAuthenticationFilter(JwtTokenProvider jwtTokenProvider, SessionRepository sessionRepository) {
+        this.jwtTokenProvider  = jwtTokenProvider;
+        this.sessionRepository = sessionRepository;
     }
 
     @Override
@@ -38,14 +42,26 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             String token = header.substring(7);
             if (jwtTokenProvider.validateToken(token)) {
                 UUID userId = jwtTokenProvider.getUserIdFromToken(token);
-                UsernamePasswordAuthenticationToken authentication =
-                        new UsernamePasswordAuthenticationToken(userId, null, List.of());
-                authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                SecurityContextHolder.getContext().setAuthentication(authentication);
+                UUID sessionId = jwtTokenProvider.getSessionIdFromToken(token);
+
+                if (sessionId != null && isSessionActive(sessionId)) {
+                    UsernamePasswordAuthenticationToken authentication =
+                            new UsernamePasswordAuthenticationToken(userId, null, List.of());
+                    authentication.setDetails(sessionId);
+                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                } else {
+                    SecurityContextHolder.clearContext();
+                }
             } else {
                 SecurityContextHolder.clearContext();
             }
         }
         filterChain.doFilter(request, response);
+    }
+
+    private boolean isSessionActive(UUID sessionId) {
+        return sessionRepository.findById(sessionId)
+                .map(session -> !session.isRevoked())
+                .orElse(false);
     }
 }

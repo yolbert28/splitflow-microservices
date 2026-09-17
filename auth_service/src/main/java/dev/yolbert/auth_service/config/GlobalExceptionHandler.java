@@ -120,6 +120,42 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(dev.yolbert.auth_service.utils.exceptions.WrongCurrentPasswordException.class)
+    public ResponseEntity<ApiErrorResponse> handleWrongCurrentPassword(dev.yolbert.auth_service.utils.exceptions.WrongCurrentPasswordException ex) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
+                ApiErrorResponse.builder()
+                        .message(ex.getMessage())
+                        .build()
+        );
+    }
+
+    @ExceptionHandler(dev.yolbert.auth_service.utils.exceptions.SamePasswordException.class)
+    public ResponseEntity<ApiErrorResponse> handleSamePassword(dev.yolbert.auth_service.utils.exceptions.SamePasswordException ex) {
+        return ResponseEntity.badRequest().body(
+                ApiErrorResponse.builder()
+                        .message(ex.getMessage())
+                        .build()
+        );
+    }
+
+    @ExceptionHandler(dev.yolbert.auth_service.utils.exceptions.EmailConflictException.class)
+    public ResponseEntity<ApiErrorResponse> handleEmailConflict(dev.yolbert.auth_service.utils.exceptions.EmailConflictException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(
+                ApiErrorResponse.builder()
+                        .message(ex.getMessage())
+                        .build()
+        );
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ApiErrorResponse> handleIllegalArgument(IllegalArgumentException ex) {
+        return ResponseEntity.badRequest().body(
+                ApiErrorResponse.builder()
+                        .message(ex.getMessage())
+                        .build()
+        );
+    }
+
     /**
      * Catch-all handler. Logs internally but does not expose details to the client.
      * Returns 500 with a generic message.

@@ -6,16 +6,12 @@ import jakarta.validation.Payload;
 import java.lang.annotation.*;
 
 @Documented
-@Constraint(validatedBy = {
-        PasswordsMatchValidator.class,
-        ChangePasswordMatchValidator.class,
-        PasswordResetConfirmMatchValidator.class
-})
-@Target({ElementType.TYPE})
+@Constraint(validatedBy = PhotoUrlValidator.class)
+@Target({ElementType.FIELD, ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
-public @interface PasswordsMatch {
+public @interface ValidPhotoUrl {
 
-    String message() default "Las contraseñas no coinciden.";
+    String message() default "La URL de la foto de perfil debe comenzar con https:// y tener como máximo 2048 caracteres.";
 
     Class<?>[] groups() default {};
 

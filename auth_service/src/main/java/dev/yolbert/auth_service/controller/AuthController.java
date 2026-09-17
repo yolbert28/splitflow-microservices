@@ -1,18 +1,7 @@
 package dev.yolbert.auth_service.controller;
 
-import dev.yolbert.auth_service.dto.ApiSuccessResponse;
-import dev.yolbert.auth_service.dto.AuthTokenResponseData;
-import dev.yolbert.auth_service.dto.LoginCommand;
-import dev.yolbert.auth_service.dto.LogoutCommand;
-import dev.yolbert.auth_service.dto.RefreshTokenCommand;
-import dev.yolbert.auth_service.dto.VerifyEmailCommand;
-import dev.yolbert.auth_service.dto.VerifyEmailResponseData;
-import dev.yolbert.auth_service.dto.VerifyLoginOtpCommand;
-import dev.yolbert.auth_service.service.LoginUseCase;
-import dev.yolbert.auth_service.service.LogoutUseCase;
-import dev.yolbert.auth_service.service.RefreshTokenUseCase;
-import dev.yolbert.auth_service.service.VerifyEmailUseCase;
-import dev.yolbert.auth_service.service.VerifyLoginOtpUseCase;
+import dev.yolbert.auth_service.dto.*;
+import dev.yolbert.auth_service.service.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -31,17 +20,26 @@ public class AuthController {
     private final VerifyLoginOtpUseCase verifyLoginOtpUseCase;
     private final RefreshTokenUseCase refreshTokenUseCase;
     private final LogoutUseCase logoutUseCase;
+    private final ResetPasswordRequestUseCase resetPasswordRequestUseCase;
+    private final ResetPasswordConfirmUseCase resetPasswordConfirmUseCase;
+    private final ResendVerificationUseCase resendVerificationUseCase;
 
     public AuthController(VerifyEmailUseCase verifyEmailUseCase,
                           LoginUseCase loginUseCase,
                           VerifyLoginOtpUseCase verifyLoginOtpUseCase,
                           RefreshTokenUseCase refreshTokenUseCase,
-                          LogoutUseCase logoutUseCase) {
-        this.verifyEmailUseCase    = verifyEmailUseCase;
-        this.loginUseCase          = loginUseCase;
-        this.verifyLoginOtpUseCase = verifyLoginOtpUseCase;
-        this.refreshTokenUseCase   = refreshTokenUseCase;
-        this.logoutUseCase         = logoutUseCase;
+                          LogoutUseCase logoutUseCase,
+                          ResetPasswordRequestUseCase resetPasswordRequestUseCase,
+                          ResetPasswordConfirmUseCase resetPasswordConfirmUseCase,
+                          ResendVerificationUseCase resendVerificationUseCase) {
+        this.verifyEmailUseCase          = verifyEmailUseCase;
+        this.loginUseCase                = loginUseCase;
+        this.verifyLoginOtpUseCase       = verifyLoginOtpUseCase;
+        this.refreshTokenUseCase         = refreshTokenUseCase;
+        this.logoutUseCase               = logoutUseCase;
+        this.resetPasswordRequestUseCase = resetPasswordRequestUseCase;
+        this.resetPasswordConfirmUseCase = resetPasswordConfirmUseCase;
+        this.resendVerificationUseCase   = resendVerificationUseCase;
     }
 
     /**
@@ -126,6 +124,54 @@ public class AuthController {
         return ResponseEntity.ok(
                 ApiSuccessResponse.<Void>builder()
                         .message("Sesión cerrada exitosamente.")
+                        .build()
+        );
+    }
+
+    /**
+     * POST /auth/password-reset/request
+     * Requests password reset OTP by email. Always responds 200 OK.
+     */
+    @PostMapping("/password-reset/request")
+    public ResponseEntity<ApiSuccessResponse<Void>> requestPasswordReset(
+            @Valid @RequestBody PasswordResetRequestCommand command) {
+        resetPasswordRequestUseCase.execute(command);
+
+        return ResponseEntity.ok(
+                ApiSuccessResponse.<Void>builder()
+                        .message("Si el correo está registrado, recibirás un código para restablecer tu contraseña.")
+                        .build()
+        );
+    }
+
+    /**
+     * POST /auth/password-reset/confirm
+     * Confirms password reset with OTP code and updates password.
+     */
+    @PostMapping("/password-reset/confirm")
+    public ResponseEntity<ApiSuccessResponse<Void>> confirmPasswordReset(
+            @Valid @RequestBody PasswordResetConfirmCommand command) {
+        resetPasswordConfirmUseCase.execute(command);
+
+        return ResponseEntity.ok(
+                ApiSuccessResponse.<Void>builder()
+                        .message("Contraseña restablecida exitosamente.")
+                        .build()
+        );
+    }
+
+    /**
+     * POST /auth/resend-verification
+     * Resends email verification OTP for unverified accounts. Always responds 200 OK.
+     */
+    @PostMapping("/resend-verification")
+    public ResponseEntity<ApiSuccessResponse<Void>> resendVerification(
+            @Valid @RequestBody ResendVerificationCommand command) {
+        resendVerificationUseCase.execute(command);
+
+        return ResponseEntity.ok(
+                ApiSuccessResponse.<Void>builder()
+                        .message("Si el correo no ha sido verificado, recibirás un nuevo código.")
                         .build()
         );
     }

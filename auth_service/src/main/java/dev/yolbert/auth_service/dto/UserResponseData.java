@@ -21,8 +21,14 @@ public class UserResponseData {
     @JsonProperty("friend_code")
     private String friendCode;
 
+    @JsonProperty("photo_url")
+    private String photoUrl;
+
     private boolean verified;
 
     @JsonProperty("created_at")
     private LocalDateTime createdAt;
+
+    @JsonProperty("updated_at")
+    private LocalDateTime updatedAt;
 }

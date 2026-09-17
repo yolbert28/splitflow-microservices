@@ -1,6 +1,7 @@
 package dev.yolbert.auth_service.config;
 
 import dev.yolbert.auth_service.dto.ApiErrorResponse;
+import dev.yolbert.auth_service.repository.SessionRepository;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
@@ -21,10 +22,14 @@ import tools.jackson.databind.ObjectMapper;
 public class SecurityConfig {
 
     private final JwtTokenProvider jwtTokenProvider;
+    private final SessionRepository sessionRepository;
     private final ObjectMapper objectMapper;
 
-    public SecurityConfig(JwtTokenProvider jwtTokenProvider, ObjectMapper objectMapper) {
-        this.jwtTokenProvider = jwtTokenProvider;
+    public SecurityConfig(JwtTokenProvider jwtTokenProvider,
+                          SessionRepository sessionRepository,
+                          ObjectMapper objectMapper) {
+        this.jwtTokenProvider  = jwtTokenProvider;
+        this.sessionRepository = sessionRepository;
         this.objectMapper     = objectMapper;
     }
 
@@ -50,10 +55,13 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/auth/login").permitAll()
                 .requestMatchers(HttpMethod.POST, "/auth/login/verify-2fa").permitAll()
                 .requestMatchers(HttpMethod.POST, "/auth/refresh").permitAll()
+                .requestMatchers(HttpMethod.POST, "/auth/password-reset/request").permitAll()
+                .requestMatchers(HttpMethod.POST, "/auth/password-reset/confirm").permitAll()
+                .requestMatchers(HttpMethod.POST, "/auth/resend-verification").permitAll()
                 .anyRequest().authenticated()
             )
             .addFilterBefore(
-                    new JwtAuthenticationFilter(jwtTokenProvider),
+                    new JwtAuthenticationFilter(jwtTokenProvider, sessionRepository),
                     UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }

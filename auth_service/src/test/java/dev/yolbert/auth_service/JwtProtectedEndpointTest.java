@@ -35,11 +35,42 @@ class JwtProtectedEndpointTest {
     @Value("${jwt.private-key}")
     private String privateKeyPem;
 
+    @Autowired
+    private dev.yolbert.auth_service.repository.UserRepository userRepository;
+
+    @Autowired
+    private dev.yolbert.auth_service.repository.SessionRepository sessionRepository;
+
     private static final String PING_ENDPOINT = "/auth/ping";
 
     @Test
     void accessWithValidToken() throws Exception {
-        String token = jwtTokenProvider.generateAccessToken(java.util.UUID.randomUUID());
+        java.util.UUID userId = java.util.UUID.randomUUID();
+        java.time.LocalDateTime nowLocal = java.time.LocalDateTime.now();
+        userRepository.save(dev.yolbert.auth_service.domain.entity.User.builder()
+                .id(userId)
+                .fullName("Test User")
+                .email("test-" + userId + "@example.com")
+                .passwordHash("hash")
+                .friendCode("FC" + userId.toString().substring(0, 8).toUpperCase())
+                .createdAt(nowLocal)
+                .updatedAt(nowLocal)
+                .build());
+
+        java.util.UUID sessionId = java.util.UUID.randomUUID();
+        sessionRepository.save(dev.yolbert.auth_service.domain.entity.Session.builder()
+                .id(sessionId)
+                .userId(userId)
+                .ipAddress(java.net.InetAddress.getLoopbackAddress())
+                .refreshTokenHash("dummy-hash-" + sessionId)
+                .revoked(false)
+                .createdAt(java.time.OffsetDateTime.now())
+                .updatedAt(java.time.OffsetDateTime.now())
+                .lastUsedAt(java.time.OffsetDateTime.now())
+                .expiresAt(java.time.OffsetDateTime.now().plusDays(7))
+                .build());
+
+        String token = jwtTokenProvider.generateAccessToken(userId, sessionId);
 
         mockMvc.perform(get(PING_ENDPOINT).header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk());
@@ -55,7 +86,32 @@ class JwtProtectedEndpointTest {
 
     @Test
     void accessWithMangledToken() throws Exception {
-        String valid = jwtTokenProvider.generateAccessToken(java.util.UUID.randomUUID());
+        java.util.UUID userId = java.util.UUID.randomUUID();
+        java.time.LocalDateTime nowLocal = java.time.LocalDateTime.now();
+        userRepository.save(dev.yolbert.auth_service.domain.entity.User.builder()
+                .id(userId)
+                .fullName("Test User")
+                .email("test-" + userId + "@example.com")
+                .passwordHash("hash")
+                .friendCode("FC" + userId.toString().substring(0, 8).toUpperCase())
+                .createdAt(nowLocal)
+                .updatedAt(nowLocal)
+                .build());
+
+        java.util.UUID sessionId = java.util.UUID.randomUUID();
+        sessionRepository.save(dev.yolbert.auth_service.domain.entity.Session.builder()
+                .id(sessionId)
+                .userId(userId)
+                .ipAddress(java.net.InetAddress.getLoopbackAddress())
+                .refreshTokenHash("dummy-hash-" + sessionId)
+                .revoked(false)
+                .createdAt(java.time.OffsetDateTime.now())
+                .updatedAt(java.time.OffsetDateTime.now())
+                .lastUsedAt(java.time.OffsetDateTime.now())
+                .expiresAt(java.time.OffsetDateTime.now().plusDays(7))
+                .build());
+
+        String valid = jwtTokenProvider.generateAccessToken(userId, sessionId);
         String mangled = valid.substring(0, valid.length() - 2) + "aa";
 
         mockMvc.perform(get(PING_ENDPOINT).header("Authorization", "Bearer " + mangled))
@@ -65,6 +121,18 @@ class JwtProtectedEndpointTest {
     @Test
     void accessWithoutToken() throws Exception {
         mockMvc.perform(get(PING_ENDPOINT))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void CA17_newProtectedEndpoints_unauthenticated_return401() throws Exception {
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch("/auth/user/me"))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch("/auth/user/me/password"))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/auth/user/me/friend-code"))
                 .andExpect(status().isUnauthorized());
     }
 

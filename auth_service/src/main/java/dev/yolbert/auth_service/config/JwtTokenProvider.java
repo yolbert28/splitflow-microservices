@@ -46,15 +46,22 @@ public class JwtTokenProvider {
         this.publicKey  = parsePublicKey(publicKeyPem);
     }
 
-    /** Creates a signed access token with claims {@code sub} (user UUID) and {@code exp}. */
-    public String generateAccessToken(UUID userId) {
+    /** Creates a signed access token with claims {@code sub} (user UUID), {@code sid} (session UUID), and {@code exp}. */
+    public String generateAccessToken(UUID userId, UUID sessionId) {
         Instant now = Instant.now();
-        return Jwts.builder()
+        var builder = Jwts.builder()
                 .subject(userId.toString())
                 .issuedAt(Date.from(now))
-                .expiration(Date.from(now.plusSeconds(ACCESS_TOKEN_TTL_SECONDS)))
-                .signWith(privateKey, Jwts.SIG.RS256)
-                .compact();
+                .expiration(Date.from(now.plusSeconds(ACCESS_TOKEN_TTL_SECONDS)));
+        if (sessionId != null) {
+            builder.claim("sid", sessionId.toString());
+        }
+        return builder.signWith(privateKey, Jwts.SIG.RS256).compact();
+    }
+
+    /** Overload for creating access token without sessionId. */
+    public String generateAccessToken(UUID userId) {
+        return generateAccessToken(userId, null);
     }
 
     /** Returns true only if the token is well-formed and its signature verifies. */
@@ -70,6 +77,12 @@ public class JwtTokenProvider {
     /** Extracts the {@code sub} claim from a verified token. */
     public UUID getUserIdFromToken(String token) {
         return UUID.fromString(getClaims(token).getSubject());
+    }
+
+    /** Extracts the {@code sid} claim from a verified token, if present. */
+    public UUID getSessionIdFromToken(String token) {
+        String sid = getClaims(token).get("sid", String.class);
+        return sid != null ? UUID.fromString(sid) : null;
     }
 
     private Claims getClaims(String token) {

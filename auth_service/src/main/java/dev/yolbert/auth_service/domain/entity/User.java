@@ -44,6 +44,9 @@ public class User {
     @Column(name = "verified_at")
     private LocalDateTime verifiedAt;
 
+    @Column(name = "photo_url")
+    private String photoUrl;
+
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 }

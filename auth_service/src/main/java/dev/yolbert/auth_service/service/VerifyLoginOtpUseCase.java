@@ -98,7 +98,7 @@ public class VerifyLoginOtpUseCase {
                 .build();
         sessionRepository.saveAndFlush(session);
 
-        String accessToken = jwtTokenProvider.generateAccessToken(user.getId());
+        String accessToken = jwtTokenProvider.generateAccessToken(user.getId(), session.getId());
         return AuthTokenResponseData.builder()
                 .accessToken(accessToken)
                 .tokenType("Bearer")
